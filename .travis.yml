@@ -1,0 +1,30 @@
+sudo: 'required'
+services:
+  - 'docker'
+
+stages:
+  - name: build-pr
+    if: type = pull_request
+  - name: build-master
+    if: (type != pull_request) AND (branch = master)
+  - name: push-latest
+    if: (type != pull_request) AND (branch = master)
+  - name: push-tag
+    if: (type != pull_request) AND (tag IS present) AND (branch = master)
+
+env:
+  - DOCKERFILE=Dockerfile TARGET=rel TAG_SUFFIX=""
+  - DOCKERFILE=Dockerfile.alpine TARGET=rel TAG_SUFFIX="-alpine"
+  - DOCKERFILE=Dockerfile TARGET=swc TAG_SUFFIX="-swc"
+  - DOCKERFILE=Dockerfile.alpine TARGET=swc TAG_SUFFIX="-swc-alpine"
+
+jobs:
+  include:
+    - stage: build-pr
+      script: docker build --build-arg TARGET=$TARGET --build-arg VERNEMQ_REPO=https://github.com/$TRAVIS_PULL_REQUEST_SLUG --build-arg VERNEMQ_GIT_REF=$TRAVIS_PULL_REQUEST_BRANCH -t $TRAVIS_JOB_ID -f $DOCKERFILE .
+    - stage: build-master
+      script: docker build --build-arg TARGET=$TARGET -t $TRAVIS_JOB_ID -f $DOCKERFILE .
+    - stage: push-latest
+      script: docker tag $TRAVIS_JOB_ID vernemq/vernemq:latest$TAG_SUFFIX && echo "Push latest master"
+    - stage: push-tag
+      script: docker tag $TRAVIS_JOB_ID vernemq/vernemq:$TRAVIS_TAG$TAG_SUFFIX && echo "Push latest tag"
